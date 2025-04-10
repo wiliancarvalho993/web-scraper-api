@@ -3,13 +3,6 @@ import requests
 from bs4 import BeautifulSoup
 import openai
 import os
-from dotenv import load_dotenv
-
-# Carrega as variáveis do arquivo .env
-load_dotenv()
-
-# Inicializando o OpenAI com a chave da API armazenada em variáveis de ambiente
-openai.api_key = os.getenv('OPENAI_API_KEY')
 
 app = Flask(__name__)
 
@@ -20,32 +13,31 @@ def home():
 @app.route("/scrape", methods=["POST"])
 def scrape():
     data = request.json
-    urls = data.get("urls")  # Obtém a lista de URLs
+    urls = data.get("urls")
 
-    if not urls:
-        return jsonify({"error": "No URLs provided"}), 400
-
-    scraped_data = []
-    
+    # Raspagem das URLs fornecidas
+    content = ""
     for url in urls:
         try:
             response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.text, "html.parser")
 
+            # Remove tags de script e style
             for tag in soup(["script", "style"]):
                 tag.decompose()
 
+            # Extrair e limpar o texto
             texto = soup.get_text(separator="\n")
             linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
-            conteudo = "\n".join(linhas[:100])  # Limitando as primeiras 100 linhas do texto
-
-            # Armazenando o conteúdo raspado para cada URL
-            scraped_data.append({"url": url, "content": conteudo})
+            content += "\n".join(linhas[:100]) + "\n\n"
         except Exception as e:
-            scraped_data.append({"url": url, "error": str(e)})
+            content += f"Erro ao processar a URL {url}: {str(e)}\n"
 
-    return jsonify({"data": scraped_data})
+    return jsonify({"text": content})
 
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json
+    message = data.get("message")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    # Enviar a mensagem para o OpenAI
